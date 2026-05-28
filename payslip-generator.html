@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payslip Generator</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  font-size:13px;
+  background:#f0f2f5;
+  color:#1f2937;
+}
+
+/* ── Layout ── */
+.app{display:flex;min-height:100vh}
+
+/* ── Sidebar ── */
+.sidebar{
+  width:310px;flex-shrink:0;
+  background:#fff;border-right:1px solid #e5e7eb;
+  padding:16px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:12px;
+}
+
+.sidebar-title{
+  font-size:15px;font-weight:700;color:#1e3a5f;
+  padding-bottom:8px;border-bottom:2px solid #3b82f6;
+}
+
+.card{
+  background:#f9fafb;border:1px solid #e5e7eb;
+  border-radius:6px;padding:12px;
+  display:flex;flex-direction:column;gap:8px;
+}
+
+.card-title{
+  font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.7px;color:#6b7280;
+}
+
+.field{display:flex;flex-direction:column;gap:3px}
+.field label{font-size:11px;font-weight:600;color:#374151}
+
+.field input,
+.field select,
+.field textarea{
+  width:100%;padding:6px 9px;
+  border:1px solid #d1d5db;border-radius:4px;
+  font-size:12px;background:#fff;color:#111827;
+  transition:border-color .15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:#3b82f6;
+}
+.field textarea{resize:vertical;min-height:56px}
+.field small{font-size:10px;color:#9ca3af}
+
+.badge{
+  background:#ecfdf5;border:1px solid #6ee7b7;
+  border-radius:4px;padding:5px 9px;
+  font-size:12px;font-weight:700;color:#065f46;
+}
+
+/* Search dropdown */
+.search-wrap{position:relative}
+.ddrop{
+  position:absolute;top:100%;left:0;right:0;
+  background:#fff;border:1px solid #d1d5db;border-top:none;
+  border-radius:0 0 4px 4px;
+  max-height:160px;overflow-y:auto;
+  z-index:300;display:none;
+  box-shadow:0 4px 10px rgba(0,0,0,.12);
+}
+.ddrop.open{display:block}
+.dd-item{
+  padding:7px 10px;cursor:pointer;
+  font-size:12px;border-bottom:1px solid #f3f4f6;
+}
+.dd-item:last-child{border:none}
+.dd-item:hover{background:#eff6ff}
+
+/* Buttons */
+.btn-stack{display:flex;flex-direction:column;gap:7px}
+.btn{
+  width:100%;padding:9px;
+  border:none;border-radius:5px;
+  font-size:12px;font-weight:700;
+  cursor:pointer;transition:filter .15s;
+}
+.btn:hover{filter:brightness(.92)}
+.btn-green{background:#22c55e;color:#fff}
+.btn-blue{background:#3b82f6;color:#fff}
+.btn-red{background:#ef4444;color:#fff}
+.btn-gray{background:#e5e7eb;color:#374151}
+
+.status{min-height:16px;font-size:11px;text-align:center;color:#16a34a;margin-top:2px}
+
+/* ── Main preview ── */
+.main{
+  flex:1;padding:28px;overflow-y:auto;
+  display:flex;flex-direction:column;align-items:center;
+}
+.preview-label{
+  font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:1px;
+  color:#9ca3af;margin-bottom:14px;align-self:flex-start;
+}
+
+/* ── Payslip ── */
+.payslip{
+  width:100%;max-width:880px;
+  background:#fff;
+  box-shadow:0 2px 20px rgba(0,0,0,.12);
+}
+
+.ps-hd{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  padding:28px 36px 22px;
+}
+.ps-hd-name{font-size:22px;font-weight:700;color:#0f172a;line-height:1.35}
+.ps-hd-co{
+  font-size:12px;font-weight:700;color:#0f172a;
+  text-align:right;flex-shrink:0;margin-left:16px;
+}
+
+/* 3-column body */
+.ps-body{
+  display:flex;gap:16px;
+  background:#ccd4e7;
+  padding:18px 28px;
+}
+.ps-col{flex:1;display:flex;flex-direction:column}
+.ps-col-hdr{font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px}
+
+.ps-box{
+  flex:1;background:#fff;
+  padding:14px 16px;
+  display:flex;flex-direction:column;
+  min-height:180px;font-size:12px;
+}
+
+.ps-row{display:flex;justify-content:space-between;margin-bottom:5px}
+.ps-row-it{
+  display:flex;justify-content:space-between;
+  margin-bottom:5px;font-style:italic;
+  font-size:11.5px;color:#555;
+}
+.ps-gap{flex:1}
+.ps-tot{
+  display:flex;justify-content:space-between;
+  border-top:1px solid #d1d5db;padding-top:8px;
+  font-style:italic;
+}
+.fw{font-weight:700}
+
+/* Footer */
+.ps-ft{background:#fff;padding:20px 28px 32px}
+.ps-ft-lbl{font-size:13px;font-weight:700;color:#0f172a;margin-bottom:14px}
+.ps-ft-ctr{display:flex;justify-content:center}
+.ps-pay{border:1px solid #9ca3af;padding:26px 48px;text-align:center}
+.ps-pay-amt{font-size:22px;font-weight:700;margin-bottom:8px}
+.ps-pay-desc{font-size:12px;font-weight:700}
+
+/* ── Print ── */
+@media print{
+  @page{margin:1.2cm;size:A4 landscape}
+
+  *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+
+  body{background:#fff}
+  .sidebar,.preview-label{display:none!important}
+  .app{display:block}
+  .main{padding:0;display:block}
+  .payslip{box-shadow:none;max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sidebar-title">Payslip Generator</div>
+
+    <!-- Employee -->
+    <div class="card">
+      <div class="card-title">Employee</div>
+
+      <div class="field">
+        <label>Search Saved Employees</label>
+        <div class="search-wrap">
+          <input id="searchQ" type="text" placeholder="Start typing a name…"
+            autocomplete="off" oninput="doSearch()" onfocus="doSearch()">
+          <div class="ddrop" id="ddrop"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Full Name *</label>
+        <input id="empName" type="text" placeholder="e.g. Dovile Speciute" oninput="render()">
+      </div>
+
+      <div class="field">
+        <label>Address</label>
+        <textarea id="empAddr" rows="3" placeholder="Employee address…" oninput="render()"></textarea>
+      </div>
+    </div>
+
+    <!-- Company & Period -->
+    <div class="card">
+      <div class="card-title">Company &amp; Period</div>
+
+      <div class="field">
+        <label>Company Name</label>
+        <input id="coName" type="text" value="4mation HCM Ltd" oninput="render()">
+      </div>
+
+      <div class="field">
+        <label>Month Ending</label>
+        <select id="monthEnd" onchange="render()"></select>
+      </div>
+
+      <div class="field">
+        <label>Payment Method</label>
+        <input id="payMeth" type="text" value="Credit transfer" oninput="render()">
+      </div>
+    </div>
+
+    <!-- Earnings -->
+    <div class="card">
+      <div class="card-title">Earnings</div>
+
+      <div class="field">
+        <label>Commission (€)</label>
+        <input id="comm" type="number" step="0.01" min="0" placeholder="0.00" oninput="calc()">
+      </div>
+
+      <div class="field">
+        <label>Expense Reimbursement (€)</label>
+        <input id="exp" type="number" step="0.01" min="0" placeholder="0.00" oninput="calc()">
+      </div>
+
+      <div class="field">
+        <label>Monthly Total (auto-calculated)</label>
+        <div class="badge" id="bMonthly">€0.00</div>
+      </div>
+    </div>
+
+    <!-- Year to Date -->
+    <div class="card">
+      <div class="card-title">Year to Date</div>
+
+      <div class="field">
+        <label>Previous Months Carry-over (€)</label>
+        <input id="ytdPrev" type="number" step="0.01" min="0" placeholder="0.00" oninput="calc()">
+        <small>Total take-home Jan → last month. Reset to 0 each January.</small>
+      </div>
+
+      <div class="field">
+        <label>YTD Total incl. this month (auto)</label>
+        <div class="badge" id="bYtd">€0.00</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-stack">
+      <button class="btn btn-green" onclick="saveEmp()">Save Employee</button>
+      <button class="btn btn-blue" onclick="window.print()">Print / Generate PDF</button>
+      <button class="btn btn-gray" onclick="clearAll()">New / Clear</button>
+      <button class="btn btn-red" id="btnDel" style="display:none" onclick="deleteEmp()">Delete Saved Employee</button>
+    </div>
+
+    <div class="status" id="statusEl"></div>
+  </aside>
+
+  <!-- ═══ PREVIEW ═══ -->
+  <main class="main">
+    <div class="preview-label">Live Preview</div>
+
+    <div class="payslip">
+
+      <!-- Header -->
+      <div class="ps-hd">
+        <div class="ps-hd-name" id="psName">Employee Name Month Ending DD-MM-YYYY</div>
+        <div class="ps-hd-co" id="psCo">4mation HCM Ltd</div>
+      </div>
+
+      <!-- 3-column body -->
+      <div class="ps-body">
+
+        <div class="ps-col">
+          <div class="ps-col-hdr">Employee Details</div>
+          <div class="ps-box">
+            <div id="psAddr" style="white-space:pre-line;color:#bbb">Address</div>
+          </div>
+        </div>
+
+        <div class="ps-col">
+          <div class="ps-col-hdr">Payments</div>
+          <div class="ps-box">
+            <div class="ps-row">
+              <span>Commission</span>
+              <span id="psComm">€0.00</span>
+            </div>
+            <div class="ps-row-it">
+              <span>Expense Reimbursement</span>
+              <span id="psExp">€0.00</span>
+            </div>
+            <div class="ps-gap"></div>
+            <div class="ps-tot">
+              <em>Total</em>
+              <span id="psPayTot" class="fw">€0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ps-col">
+          <div class="ps-col-hdr">Year to Date</div>
+          <div class="ps-box">
+            <div class="ps-row">
+              <span>Take-home Pay</span>
+              <span id="psYtdTH" class="fw">€0.00</span>
+            </div>
+            <div class="ps-gap"></div>
+            <div class="ps-tot">
+              <em>Total</em>
+              <span id="psYtdTot" class="fw">€0.00</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer payment box -->
+      <div class="ps-ft">
+        <div class="ps-ft-lbl">Payment</div>
+        <div class="ps-ft-ctr">
+          <div class="ps-pay">
+            <div class="ps-pay-amt" id="psPayAmt">€0.00</div>
+            <div class="ps-pay-desc" id="psPayDesc">Paid by Credit transfer DD/MM/YYYY</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /payslip -->
+  </main>
+
+</div>
+
+<script>
+// ── Storage ──────────────────────────────────────────────────────────────────
+const SKEY   = 'payslip_gen_v1';
+const loadDB = () => { try { return JSON.parse(localStorage.getItem(SKEY) || '[]'); } catch { return []; } };
+const saveDB = d => localStorage.setItem(SKEY, JSON.stringify(d));
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+const eid = id => document.getElementById(id);
+const fmt = n  => '€' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const dispDate  = v => { if (!v) return 'DD-MM-YYYY'; const [y,m,d] = v.split('-'); return `${d}-${m}-${y}`; };
+const slashDate = v => { if (!v) return 'DD/MM/YYYY'; const [y,m,d] = v.split('-'); return `${d}/${m}/${y}`; };
+
+// ── Month dropdown ────────────────────────────────────────────────────────────
+function buildMonths() {
+  const sel = eid('monthEnd');
+  const now = new Date();
+  const rows = [];
+  for (let i = -24; i <= 12; i++) {
+    const t = new Date(now.getFullYear(), now.getMonth() + i + 1, 0);
+    const d = String(t.getDate()).padStart(2, '0');
+    const m = String(t.getMonth() + 1).padStart(2, '0');
+    const y = t.getFullYear();
+    rows.push({ v: `${y}-${m}-${d}`, l: `${d}-${m}-${y}` });
+  }
+  rows.reverse().forEach(({ v, l }) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = l;
+    sel.appendChild(o);
+  });
+  // Default = previous calendar month
+  const p  = new Date(now.getFullYear(), now.getMonth(), 0);
+  const py = p.getFullYear();
+  const pm = String(p.getMonth() + 1).padStart(2, '0');
+  const pd = String(p.getDate()).padStart(2, '0');
+  sel.value = `${py}-${pm}-${pd}`;
+}
+
+// ── Derive computed values ────────────────────────────────────────────────────
+function vals() {
+  const c   = parseFloat(eid('comm').value)    || 0;
+  const e   = parseFloat(eid('exp').value)     || 0;
+  const prv = parseFloat(eid('ytdPrev').value) || 0;
+  return { c, e, prv, monthly: c + e, ytd: prv + c + e };
+}
+
+// ── Calc (updates badges + preview) ──────────────────────────────────────────
+function calc() {
+  const { monthly, ytd } = vals();
+  eid('bMonthly').textContent = fmt(monthly);
+  eid('bYtd').textContent     = fmt(ytd);
+  render();
+}
+
+// ── Render payslip preview ────────────────────────────────────────────────────
+function render() {
+  const name  = eid('empName').value.trim() || 'Employee Name';
+  const addr  = eid('empAddr').value.trim();
+  const co    = eid('coName').value.trim()  || '4mation HCM Ltd';
+  const mEnd  = eid('monthEnd').value;
+  const pm    = eid('payMeth').value.trim() || 'Credit transfer';
+  const { c, e, monthly, ytd } = vals();
+
+  eid('psName').textContent = `${name} Month Ending ${dispDate(mEnd)}`;
+  eid('psCo').textContent   = co;
+
+  const addrEl = eid('psAddr');
+  addrEl.textContent = addr || 'Address';
+  addrEl.style.color = addr ? '#1f2937' : '#bbb';
+
+  eid('psComm').textContent    = fmt(c);
+  eid('psExp').textContent     = fmt(e);
+  eid('psPayTot').textContent  = fmt(monthly);
+  eid('psYtdTH').textContent   = fmt(monthly);
+  eid('psYtdTot').textContent  = fmt(ytd);
+  eid('psPayAmt').textContent  = fmt(monthly);
+  eid('psPayDesc').textContent = `Paid by ${pm} ${slashDate(mEnd)}`;
+
+  eid('bMonthly').textContent = fmt(monthly);
+  eid('bYtd').textContent     = fmt(ytd);
+}
+
+// ── Search / autocomplete ─────────────────────────────────────────────────────
+function doSearch() {
+  const q   = eid('searchQ').value.toLowerCase();
+  const dd  = eid('ddrop');
+  const all = loadDB().filter(e => !q || e.name.toLowerCase().includes(q));
+  if (!all.length) { dd.classList.remove('open'); return; }
+  dd.innerHTML = '';
+  all.forEach(emp => {
+    const div = document.createElement('div');
+    div.className = 'dd-item';
+    div.textContent = emp.name;
+    div.addEventListener('click', () => populateForm(emp));
+    dd.appendChild(div);
+  });
+  dd.classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) eid('ddrop').classList.remove('open');
+});
+
+// ── Load saved employee into form ─────────────────────────────────────────────
+let _loadedName = null;
+
+function populateForm(emp) {
+  eid('empName').value = emp.name;
+  eid('empAddr').value = emp.address       || '';
+  eid('coName').value  = emp.company       || '4mation HCM Ltd';
+  eid('payMeth').value = emp.paymentMethod || 'Credit transfer';
+  // ytdCarryover stored = running total after last saved payslip → use as prev carry-over
+  eid('ytdPrev').value = emp.ytdCarryover != null ? emp.ytdCarryover.toFixed(2) : '';
+  eid('searchQ').value = emp.name;
+  eid('ddrop').classList.remove('open');
+  _loadedName = emp.name;
+  eid('btnDel').style.display = 'block';
+  calc();
+  toast(`Loaded: ${emp.name}`);
+}
+
+// ── Save employee ─────────────────────────────────────────────────────────────
+function saveEmp() {
+  const name = eid('empName').value.trim();
+  if (!name) { toast('Please enter an employee name.', true); return; }
+
+  const { monthly } = vals();
+  const prv = parseFloat(eid('ytdPrev').value) || 0;
+
+  const rec = {
+    name,
+    address:       eid('empAddr').value,
+    company:       eid('coName').value  || '4mation HCM Ltd',
+    paymentMethod: eid('payMeth').value || 'Credit transfer',
+    ytdCarryover:  prv + monthly,  // becomes carry-over for the next payslip
+    saved:         new Date().toISOString()
+  };
+
+  const db  = loadDB();
+  const idx = db.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
+  if (idx >= 0) { db[idx] = rec; toast(`Updated: ${name}`); }
+  else          { db.push(rec);  toast(`Saved: ${name}`); }
+  saveDB(db);
+  _loadedName = name;
+  eid('btnDel').style.display = 'block';
+}
+
+// ── Delete saved employee ─────────────────────────────────────────────────────
+function deleteEmp() {
+  const name = eid('empName').value.trim() || _loadedName;
+  if (!name) { toast('No employee loaded.', true); return; }
+  if (!confirm(`Delete saved record for "${name}"?`)) return;
+  saveDB(loadDB().filter(e => e.name.toLowerCase() !== name.toLowerCase()));
+  _loadedName = null;
+  eid('btnDel').style.display = 'none';
+  toast(`Deleted: ${name}`);
+}
+
+// ── Clear form ────────────────────────────────────────────────────────────────
+function clearAll() {
+  ['empName', 'empAddr', 'comm', 'exp', 'ytdPrev', 'searchQ'].forEach(id => eid(id).value = '');
+  eid('coName').value  = '4mation HCM Ltd';
+  eid('payMeth').value = 'Credit transfer';
+  _loadedName = null;
+  eid('btnDel').style.display = 'none';
+  const now = new Date();
+  const p   = new Date(now.getFullYear(), now.getMonth(), 0);
+  eid('monthEnd').value = `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}-${String(p.getDate()).padStart(2,'0')}`;
+  calc();
+  toast('Form cleared.');
+}
+
+// ── Status toast ──────────────────────────────────────────────────────────────
+let _tid;
+function toast(msg, err = false) {
+  clearTimeout(_tid);
+  const el = eid('statusEl');
+  el.textContent = msg;
+  el.style.color = err ? '#dc2626' : '#16a34a';
+  _tid = setTimeout(() => el.textContent = '', 3000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildMonths();
+render();
+</script>
+
+</body>
+</html>
