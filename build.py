@@ -4,7 +4,7 @@ Uses the same primitives as Web Crypto API:
   - PBKDF2-HMAC-SHA256 (600,000 iterations) → 256-bit AES key
   - AES-GCM-256 encryption
 """
-import base64, os, re, sys
+import base64, json, os, re, sys
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -13,9 +13,24 @@ USER = "payroll@benisonsolvers.co.uk"
 PASS = "benison@sarv14"
 ITER = 600_000
 
+# Sync backend secrets are loaded from .secrets.json (gitignored).
+# That file contains: { "gist_id": "...", "gist_token": "..." }
+# The values end up inside the encrypted bundle, so they're only readable
+# after successful login — but we still must keep them out of source.
+if not os.path.exists(".secrets.json"):
+    sys.exit("Missing .secrets.json — create it with gist_id and gist_token")
+with open(".secrets.json", "r", encoding="utf-8") as f:
+    _secrets = json.load(f)
+GIST_ID    = _secrets["gist_id"]
+GIST_TOKEN = _secrets["gist_token"]
+
 # --- Read original app ---
 with open("app.html", "r", encoding="utf-8") as f:
     full = f.read()
+
+# Substitute the sync placeholders BEFORE encryption — they end up inside the ciphertext.
+full = full.replace("__GIST_ID__",    GIST_ID)
+full = full.replace("__GIST_TOKEN__", GIST_TOKEN)
 
 style_match = re.search(r"<style>[\s\S]*?</style>", full)
 body_match  = re.search(r"<body>([\s\S]*?)</body>", full)
@@ -27,8 +42,13 @@ bundle_bytes = bundle.encode("utf-8")
 print(f"Bundle: {len(bundle_bytes)} bytes")
 
 # --- Derive key ---
-salt = os.urandom(16)
-iv   = os.urandom(12)
+# Fixed salt so the key stays stable across rebuilds — required because the same
+# key encrypts both the bundle AND the synced employee data in the gist. If the
+# salt changed per build, previously-synced gist data would become undecryptable
+# after every build. Salt is public anyway (it's visible in the login page); the
+# security comes from PBKDF2's 600,000 iterations.
+salt = b"payslip-gen-v1-s"  # exactly 16 bytes
+iv   = os.urandom(12)        # iv is per-build (must be unique per encryption)
 
 kdf = PBKDF2HMAC(
     algorithm=hashes.SHA256(),
@@ -133,27 +153,33 @@ async function unlock(user, pass) {
     "raw", enc.encode(user + ":" + pass),
     { name: "PBKDF2" }, false, ["deriveKey"]
   );
+  // Derive with encrypt+decrypt so the same key can power E2E sync later
   const key = await crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: b64dec(SALT_B64), iterations: ITER, hash: "SHA-256" },
     baseKey,
     { name: "AES-GCM", length: 256 },
-    false, ["decrypt"]
+    false, ["encrypt", "decrypt"]
   );
   const plain = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: b64dec(IV_B64) },
     key, b64dec(CT_B64)
   );
+  // Expose key to the mounted app for end-to-end-encrypted sync
+  window.__syncKey = key;
   return new TextDecoder().decode(plain);
 }
 
 function mountApp(html) {
   document.body.innerHTML = html;
   document.body.style.cssText = "";
+  // Scripts inserted via innerHTML do not execute — we must re-create and append them.
+  // replaceWith() is unreliable; createElement + appendChild forces execution.
   document.body.querySelectorAll("script").forEach(old => {
     const s = document.createElement("script");
     if (old.src) s.src = old.src;
     else s.textContent = old.textContent;
-    old.replaceWith(s);
+    old.remove();
+    document.body.appendChild(s);
   });
 }
 

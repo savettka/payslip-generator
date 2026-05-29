@@ -3,3 +3,7 @@ app.html
 
 # Local server config — not needed in repo
 .claude/
+_tmp_script.js
+
+# Secrets (gist token) — embedded into encrypted bundle at build time
+.secrets.json
