@@ -1,0 +1,5 @@
+# Local-only — never commit the unencrypted app source
+app.html
+
+# Local server config — not needed in repo
+.claude/
